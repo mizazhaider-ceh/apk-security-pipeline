@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300">
+  <rect width="1200" height="300" fill="#ffffff"/>
+  <text x="600" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#17191C">How the pipeline works</text>
+  <text x="600" y="62" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#5C6068">One command in, one explained report out. No server, no cloud, no dependencies.</text>
+  <!-- boxes -->
+  <g font-family="Arial, sans-serif">
+    <g>
+      <rect x="20" y="110" width="150" height="90" rx="12" fill="#EEE8FF" stroke="#5A45D6" stroke-width="2"/>
+      <text x="95" y="148" text-anchor="middle" font-size="17" font-weight="700" fill="#17191C">APK in</text>
+      <text x="95" y="172" text-anchor="middle" font-size="13" fill="#5C6068">APK, folder,</text>
+      <text x="95" y="190" text-anchor="middle" font-size="13" fill="#5C6068">or manifest</text>
+    </g>
+    <g>
+      <rect x="200" y="110" width="150" height="90" rx="12" fill="#ffffff" stroke="#5A45D6" stroke-width="2"/>
+      <text x="275" y="148" text-anchor="middle" font-size="17" font-weight="700" fill="#17191C">Manifest</text>
+      <text x="275" y="172" text-anchor="middle" font-size="13" fill="#5C6068">binary or plain</text>
+      <text x="275" y="190" text-anchor="middle" font-size="13" fill="#5C6068">XML parsed</text>
+    </g>
+    <g>
+      <rect x="380" y="110" width="150" height="90" rx="12" fill="#ffffff" stroke="#5A45D6" stroke-width="2"/>
+      <text x="455" y="148" text-anchor="middle" font-size="17" font-weight="700" fill="#17191C">Static rules</text>
+      <text x="455" y="172" text-anchor="middle" font-size="13" fill="#5C6068">flags, exports,</text>
+      <text x="455" y="190" text-anchor="middle" font-size="13" fill="#5C6068">secrets, code</text>
+    </g>
+    <g>
+      <rect x="560" y="110" width="150" height="90" rx="12" fill="#DDE8D1" stroke="#4E7A12" stroke-width="2"/>
+      <text x="635" y="148" text-anchor="middle" font-size="17" font-weight="700" fill="#17191C">Dynamic</text>
+      <text x="635" y="172" text-anchor="middle" font-size="13" fill="#5C6068">Frida traces on</text>
+      <text x="635" y="190" text-anchor="middle" font-size="13" fill="#5C6068">your test app</text>
+    </g>
+    <g>
+      <rect x="740" y="110" width="150" height="90" rx="12" fill="#ffffff" stroke="#5A45D6" stroke-width="2"/>
+      <text x="815" y="148" text-anchor="middle" font-size="17" font-weight="700" fill="#17191C">Score</text>
+      <text x="815" y="172" text-anchor="middle" font-size="13" fill="#5C6068">0 to 100, grade,</text>
+      <text x="815" y="190" text-anchor="middle" font-size="13" fill="#5C6068">baseline diff</text>
+    </g>
+    <g>
+      <rect x="920" y="110" width="150" height="90" rx="12" fill="#EEE8FF" stroke="#5A45D6" stroke-width="2"/>
+      <text x="995" y="148" text-anchor="middle" font-size="17" font-weight="700" fill="#17191C">Report out</text>
+      <text x="995" y="172" text-anchor="middle" font-size="13" fill="#5C6068">HTML for humans,</text>
+      <text x="995" y="190" text-anchor="middle" font-size="13" fill="#5C6068">JSON for CI</text>
+    </g>
+    <!-- arrows -->
+    <g fill="#5A45D6" font-size="22" font-weight="700">
+      <text x="172" y="162">›</text>
+      <text x="352" y="162">›</text>
+      <text x="532" y="162">›</text>
+      <text x="712" y="162">›</text>
+      <text x="892" y="162">›</text>
+    </g>
+  </g>
+  <text x="600" y="248" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#5C6068">Every stage logs what it did, what it found, and what it skipped. Secrets are masked in every report.</text>
+  <text x="600" y="274" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#5C6068">Only run against apps you own or have explicit permission to test.</text>
+</svg>
