@@ -119,7 +119,11 @@ def parse_axml(data):
             name = strings[name_idx] if 0 <= name_idx < len(strings) else ""
             _ = ns_idx
             attrs = {}
-            base = pos + attr_start
+            # attributeStart is relative to the end of the node header
+            # (chunk header 8 bytes + line/comment 8 bytes = header_size),
+            # NOT relative to the chunk start. Real files store 20 here,
+            # so attributes begin at chunk start + header_size + 20 = 36.
+            base = pos + header_size + attr_start
             for i in range(attr_count):
                 a = base + i * attr_size
                 (_ans, aname_idx, raw_idx) = struct.unpack_from("<III", data, a)

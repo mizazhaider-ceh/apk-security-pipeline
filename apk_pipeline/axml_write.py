@@ -43,18 +43,28 @@ def _collect_strings(node, pool, index):
         _collect_strings(child, pool, index)
 
 
-def _string_pool_chunk(pool):
+def _string_pool_chunk(pool, utf16=False):
     entries = []
     for text in pool:
-        raw = text.encode("utf-8")
-        entries.append(_encode_len(len(raw)) + _encode_len(len(raw)) + raw + b"\x00")
+        if utf16:
+            raw = text.encode("utf-16-le")
+            count = len(raw) // 2
+            if count < 0x8000:
+                entries.append(struct.pack("<H", count) + raw + b"\x00\x00")
+            else:
+                entries.append(struct.pack("<HH", (count >> 16) | 0x8000,
+                                           count & 0xFFFF) + raw + b"\x00\x00")
+        else:
+            raw = text.encode("utf-8")
+            entries.append(_encode_len(len(raw)) + _encode_len(len(raw)) + raw + b"\x00")
     offsets = []
     pos = 0
     for entry in entries:
         offsets.append(pos)
         pos += len(entry)
     strings_start = 28 + 4 * len(pool)
-    body = struct.pack("<IIIII", len(pool), 0, 0x100, strings_start, 0)
+    flags = 0 if utf16 else 0x100
+    body = struct.pack("<IIIII", len(pool), 0, flags, strings_start, 0)
     for off in offsets:
         body += struct.pack("<I", off)
     for entry in entries:
@@ -76,7 +86,9 @@ def _start_element_chunk(node, index):
     name_idx = index[node["name"]]
     out += struct.pack("<HHI", 0x0102, 16, 36 + 20 * len(attrs))
     out += struct.pack("<IIII", 0, 0xFFFFFFFF, 0xFFFFFFFF, name_idx)
-    out += struct.pack("<HHHHHH", 36, 20, len(attrs), 0xFFFF, 0xFFFF, 0xFFFF)
+    # attributeStart is 20: relative to the end of the node header, per
+    # the binary XML spec. Real toolchains store 20, not 36.
+    out += struct.pack("<HHHHHH", 20, 20, len(attrs), 0xFFFF, 0xFFFF, 0xFFFF)
     for name, value in attrs:
         short = name.split(":")[-1]
         ns_idx = index[ANDROID_NS] if ":" in name else 0xFFFFFFFF
@@ -108,15 +120,19 @@ def _emit(node, index, out):
     out.append(_end_element_chunk(node, index))
 
 
-def build_axml(root):
-    """Build AXML bytes for one manifest tree."""
+def build_axml(root, utf16=False):
+    """Build AXML bytes for one manifest tree.
+
+    utf16=True emits a UTF-16 string pool, the shape real toolchains
+    produce. Used by tests to prove the parser handles real APKs.
+    """
     pool = []
     index = {}
     _collect_strings(root, pool, index)
     if ANDROID_NS not in index:
         index[ANDROID_NS] = len(pool)
         pool.append(ANDROID_NS)
-    chunks = [_string_pool_chunk(pool)]
+    chunks = [_string_pool_chunk(pool, utf16=utf16)]
     chunks.append(_namespace_chunk(0x0100, index["android"] if "android" in index else 0, index[ANDROID_NS]))
     parts = []
     _emit(root, index, parts)

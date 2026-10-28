@@ -350,5 +350,71 @@ class TestDynamicLog(unittest.TestCase):
             self.assertEqual(result["findings"], [])
 
 
+class TestRealApkShape(unittest.TestCase):
+    """Regression tests for the real APK attributeStart bug (2026-10-28).
+
+    Real toolchains store attributeStart=20, relative to the end of
+    the node header. An earlier parser version read attributes from
+    chunk start + attributeStart, which garbled every attribute on
+    real APKs while the project's own writer (which wrongly stored 36)
+    kept roundtrip tests green.
+    """
+
+    def test_spec_attribute_start_is_20(self):
+        import struct
+        from apk_pipeline.axml_write import build_axml
+        data = build_axml(manifest_clean())
+        pos = 8
+        while pos + 8 <= len(data):
+            ctype, _hsize, csize = struct.unpack_from("<HHI", data, pos)
+            if ctype == 0x0102:
+                (attr_start,) = struct.unpack_from("<H", data, pos + 24)
+                self.assertEqual(attr_start, 20)
+                return
+            pos += csize
+        self.fail("no StartElement chunk found")
+
+    def test_utf16_pool_parses(self):
+        from apk_pipeline.axml_write import build_axml
+        info = parse_manifest_bytes(build_axml(manifest_clean(), utf16=True))
+        self.assertEqual(info["package"], "com.example.cleanapp")
+        self.assertIn("android.permission.INTERNET", info["permissions"])
+        self.assertEqual(len(info["components"]), 2)
+
+    def test_resource_map_chunk_skipped(self):
+        import struct
+        from apk_pipeline.axml_write import build_axml
+        data = build_axml(manifest_clean())
+        _ctype, _hsize, pool_size = struct.unpack_from("<HHI", data, 8)
+        resmap = struct.pack("<HHI", 0x0180, 8, 16) + struct.pack("<II", 0x01010000, 0x01010001)
+        spliced = data[:8 + pool_size] + resmap + data[8 + pool_size:]
+        spliced = struct.pack("<II", 0x00080003, len(spliced)) + spliced[8:]
+        info = parse_manifest_bytes(spliced)
+        self.assertEqual(info["package"], "com.example.cleanapp")
+        self.assertEqual(len(info["components"]), 2)
+
+    def test_many_root_attributes_parse(self):
+        from apk_pipeline.axml_write import build_axml
+        tree = {
+            "name": "manifest",
+            "attrs": [("package", "com.example.real"),
+                      ("android:versionCode", 42),
+                      ("android:versionName", "2.3"),
+                      ("android:compileSdkVersion", 34),
+                      ("android:platformBuildVersionCode", 34)],
+            "children": [
+                {"name": "uses-permission",
+                 "attrs": [("android:name", "android.permission.INTERNET")],
+                 "children": []},
+                {"name": "application", "attrs": [], "children": []},
+            ],
+        }
+        info = parse_manifest_bytes(build_axml(tree))
+        self.assertEqual(info["package"], "com.example.real")
+        self.assertEqual(info["version_code"], "42")
+        self.assertEqual(info["version_name"], "2.3")
+        self.assertEqual(info["permissions"], ["android.permission.INTERNET"])
+
+
 if __name__ == "__main__":
     unittest.main()

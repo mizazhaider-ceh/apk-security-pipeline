@@ -46,6 +46,28 @@ leak checks, determinism, performance).
   traceback instead of a clean scan error. Fixed in scanner.py:
   baseline loading now raises ScanError, CLI exits 1 with a plain message.
 
+## Real APK validation, added 2026-10-28 (v1.0.1)
+
+A real run on a course lab APK reported package unknown and 0
+permissions while components parsed, which exposed a parser bug that
+synthetic tests could not see. Root cause: the parser read attributes
+from chunk start + attributeStart, but the spec defines attributeStart
+relative to the end of the node header, and real toolchains store 20
+there (attributes at chunk start + 16 + 20 = 36). The project's own
+writer stored 36, so roundtrip tests stayed green while real APKs
+parsed garbage attributes. Fixed in axml.py (base = chunk start +
+header size + attributeStart) and axml_write.py (now stores the spec
+value 20). Verified against androguard as ground truth:
+
+| APK | Ours package | Truth package | Perms | Components |
+| --- | --- | --- | --- | --- |
+| Test-debug.apk | org.t0t0.androguard.test | org.t0t0.androguard.test | 0 / 0 | 1 / 1 |
+| TestActivity.apk | tests.androguard | tests.androguard | 0 / 0 | 1 / 1 |
+| TC-debug.apk | org.t0t0.androguard.TC | org.t0t0.androguard.TC | 0 / 0 | 1 / 1 |
+
+4 regression tests added (spec attributeStart value, UTF-16 pool,
+resource map skipping, many root attributes). Total suite now 42 tests.
+
 ## Defects fixed in earlier rounds (re-verified here)
 
 - Namespace URL false positive: the Android namespace URI was flagged
