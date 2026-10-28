@@ -415,6 +415,51 @@ def strings_summary(files):
             "public_ip_count": public_ips}
 
 
+def contents_breakdown(files):
+    """Break the APK contents down by part, so each part is separate.
+
+    files is a list of (path, bytes). Returns a dict of categories,
+    each with a file count, total bytes, and the file list.
+    """
+    def category(path):
+        if path.endswith(".dex") or path.startswith("classes"):
+            return "dex code"
+        if path == "AndroidManifest.xml":
+            return "manifest"
+        if path == "resources.arsc" or path.startswith("res/"):
+            return "resources"
+        if path.startswith("assets/"):
+            return "assets"
+        if path.startswith("lib/"):
+            return "native libs"
+        if path.startswith("META-INF/"):
+            return "signing"
+        return "other"
+
+    breakdown = {}
+    for path, data in files:
+        entry = breakdown.setdefault(category(path), {"count": 0, "bytes": 0, "files": []})
+        entry["count"] += 1
+        entry["bytes"] += len(data)
+        entry["files"].append(path)
+    return breakdown
+
+
+def resources_inventory(decoded_dir):
+    """Count decoded resources by folder (values, layout, xml, ...)."""
+    res_root = os.path.join(decoded_dir, "res")
+    counts = {}
+    if not os.path.isdir(res_root):
+        return counts
+    for dirpath, _dirs, names in os.walk(res_root):
+        folder = os.path.relpath(dirpath, res_root)
+        if folder == ".":
+            continue
+        top = folder.split(os.sep)[0]
+        counts[top] = counts.get(top, 0) + len(names)
+    return counts
+
+
 def androguard_stage(apk_path):
     """Deep dex facts via androguard, when installed.
 
@@ -539,6 +584,7 @@ def run_deep(input_path, manifest_info, files, work_root,
     findings.extend(sign_findings)
     inventory["signing"] = sign_info
     inventory["native_libs"] = native_inventory(files)
+    inventory["contents"] = contents_breakdown(files)
     log.append(_stage(
         "Signing and native libs",
         "Check the signing certificate and list shipped native libraries.",
@@ -577,6 +623,7 @@ def run_deep(input_path, manifest_info, files, work_root,
         smali_findings, smali_stats = scan_smali_dir(smali_root)
         findings.extend(smali_findings)
         inventory["smali"] = smali_stats
+        inventory["resources"] = resources_inventory(decoded_dir)
         log.append(_stage(
             "Smali analysis (decoded dir)",
             "Read smali method by method and flag risky APIs with method context.",
@@ -636,7 +683,7 @@ def run_deep(input_path, manifest_info, files, work_root,
                                      ("SMALI_", "NETCFG_"))])
                 inventory["apktool"] = {"decoded_dir": apktool_dir}
                 inventory.update({k: v for k, v in sub_inventory.items()
-                                  if k in ("smali", "network_config")})
+                                  if k in ("smali", "network_config", "resources")})
             else:
                 log.append(_stage(
                     "Apktool decode",

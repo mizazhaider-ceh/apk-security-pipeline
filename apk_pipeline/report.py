@@ -69,35 +69,81 @@ def write_html(result, path):
     if result.get("deep"):
         tool_rows = ""
         for name, info in (result.get("deep_tools") or {}).items():
+            if name == "tools_dir":
+                continue
             tool_rows += "<tr><td><b>%s</b></td><td>%s</td><td>%s</td></tr>" % (
                 html.escape(name),
                 "found" if info.get("found") else "missing",
                 html.escape(info.get("path") or info.get("version") or info.get("install", "")))
+
+        def _count(prefix):
+            return sum(1 for f in findings
+                       if isinstance(f, dict) and f.get("id", "").startswith(prefix))
+
+        sections = ["<h2>Deep mode: tools</h2><table><tr><th>Tool</th><th>Status</th><th>Path, version, or install note</th></tr>%s</table>" % tool_rows]
+        sections.append("<h2>Deep mode: results per tool</h2>")
+        if deep_inv.get("smali") is not None:
+            sections.append(
+                "<h3>Apktool: smali and resources</h3>"
+                "<p>Decoded directory: %s</p>"
+                "<p>Smali: %s, smali findings: %d, network config findings: %d</p>"
+                "<p>Resources by folder: %s</p>"
+                % (html.escape(str((deep_inv.get("apktool") or {}).get("decoded_dir", ""))),
+                   html.escape(json.dumps(deep_inv.get("smali", {}), sort_keys=True)),
+                   _count("SMALI_"), _count("NETCFG_"),
+                   html.escape(json.dumps(deep_inv.get("resources", {}), sort_keys=True))))
+        if deep_inv.get("jadx") is not None:
+            sections.append(
+                "<h3>Jadx: Java sources</h3>"
+                "<p>Java: %s, Java findings: %d</p>"
+                % (html.escape(json.dumps(deep_inv.get("jadx", {}), sort_keys=True)),
+                   _count("JAVA_")))
+        if deep_inv.get("androguard") is not None:
+            sections.append(
+                "<h3>Androguard: dex facts</h3>"
+                "<p>%s, androguard findings: %d</p>"
+                % (html.escape(json.dumps(deep_inv.get("androguard", {}), sort_keys=True)),
+                   _count("AG_")))
         links = deep_inv.get("deep_links", [])
+        sections.append(
+            "<h3>Deep links</h3><p>%s</p>"
+            % (html.escape(", ".join(links)) if links else "none"))
+        sections.append(
+            "<h3>Signing</h3><p>%s</p>"
+            % html.escape(json.dumps(deep_inv.get("signing", {}), sort_keys=True)))
         libs = deep_inv.get("native_libs", [])
+        lib_rows = "".join("<li>%s (%s, %d bytes)</li>" % (
+            html.escape(item["path"]), html.escape(item["abi"]), item["size"]) for item in libs)
+        sections.append(
+            "<h3>Native libraries (%d)</h3><ul>%s</ul>"
+            % (len(libs), lib_rows if lib_rows else "<li>none</li>"))
         strings = deep_inv.get("strings", {})
         hosts = strings.get("url_hosts", {}) if isinstance(strings, dict) else {}
         host_rows = "".join("<li>%s (x%d)</li>" % (html.escape(h), c) for h, c in sorted(hosts.items()))
-        lib_rows = "".join("<li>%s (%s, %d bytes)</li>" % (
-            html.escape(item["path"]), html.escape(item["abi"]), item["size"]) for item in libs)
-        deep_html = (
-            "<h2>Deep mode: tools</h2><table><tr><th>Tool</th><th>Status</th><th>Path, version, or install note</th></tr>%s</table>"
-            "<h2>Deep mode: inventory</h2>"
-            "<p><b>Deep links:</b> %s</p>"
-            "<p><b>Native libraries (%d):</b></p><ul>%s</ul>"
-            "<p><b>URL hosts found:</b></p><ul>%s</ul>"
-            "<p><b>Signing:</b> %s</p>"
-            "<p><b>Smali stats:</b> %s</p>"
-            "<p><b>Java stats:</b> %s</p>"
-            "<p><b>Network config:</b> %s</p>"
-            % (tool_rows,
-               html.escape(", ".join(links)) if links else "none",
-               len(libs), lib_rows if lib_rows else "<li>none</li>",
-               host_rows if host_rows else "<li>none</li>",
-               html.escape(json.dumps(deep_inv.get("signing", {}), sort_keys=True)),
-               html.escape(json.dumps(deep_inv.get("smali", {}), sort_keys=True)),
-               html.escape(json.dumps(deep_inv.get("jadx", {}), sort_keys=True)),
-               html.escape(json.dumps(deep_inv.get("network_config", {}), sort_keys=True))))
+        sections.append(
+            "<h3>URL hosts and IPs</h3><ul>%s</ul><p>Private IPs: %s, public IP matches: %s</p>"
+            % (host_rows if host_rows else "<li>none</li>",
+               html.escape(", ".join(strings.get("private_ips", [])) or "none"),
+               strings.get("public_ip_count", 0)))
+        sections.append(
+            "<h3>Network config</h3><p>%s</p>"
+            % html.escape(json.dumps(deep_inv.get("network_config", {}), sort_keys=True)))
+        contents = deep_inv.get("contents", {})
+        if contents:
+            content_rows = "".join(
+                "<tr><td><b>%s</b></td><td>%d</td><td>%d</td><td>%s</td></tr>" % (
+                    html.escape(category), entry["count"], entry["bytes"],
+                    html.escape(", ".join(entry["files"][:20])) +
+                    (" and %d more" % (len(entry["files"]) - 20) if len(entry["files"]) > 20 else ""))
+                for category, entry in sorted(contents.items()))
+            sections.append(
+                "<h3>APK contents, each part separate</h3>"
+                "<table><tr><th>Part</th><th>Files</th><th>Bytes</th><th>Files (first 20)</th></tr>%s</table>"
+                % content_rows)
+        sections.append(
+            "<p>Per tool detail files: deep-work/apktool.json, deep-work/jadx.json, "
+            "deep-work/androguard.json, deep-work/deep-inventory.json</p>")
+        deep_html = "".join(sections)
     baseline_html = ""
     if result.get("baseline"):
         baseline = result["baseline"]
@@ -144,6 +190,50 @@ code{background:#EEE8FF;padding:1px 6px;border-radius:6px}</style></head>
     return path
 
 
+def write_deep_files(result, out_dir):
+    """Write one detail file per deep tool, plus the full deep inventory.
+
+    Each file is separate, so a reader can open just the apktool part,
+    just the jadx part, or just the androguard part.
+    """
+    deep_inv = result.get("deep_inventory") or {}
+    if not result.get("deep"):
+        return {}
+    deep_dir = os.path.join(out_dir, "deep-work")
+    os.makedirs(deep_dir, exist_ok=True)
+    findings = result["findings"]
+
+    def _by_prefix(prefixes):
+        return [f for f in findings
+                if any(f.get("id", "").startswith(p) for p in prefixes)]
+
+    parts = {
+        "apktool": {"findings": _by_prefix(("SMALI_", "NETCFG_")),
+                    "smali": deep_inv.get("smali"),
+                    "resources": deep_inv.get("resources"),
+                    "network_config": deep_inv.get("network_config"),
+                    "decoded_dir": (deep_inv.get("apktool") or {}).get("decoded_dir")},
+        "jadx": {"findings": _by_prefix(("JAVA_",)),
+                 "java": deep_inv.get("jadx")},
+        "androguard": {"findings": _by_prefix(("AG_",)),
+                       "dex": deep_inv.get("androguard")},
+    }
+    written = {}
+    for name, data in parts.items():
+        if data["findings"] or any(v is not None for k, v in data.items() if k != "findings"):
+            path = os.path.join(deep_dir, "%s.json" % name)
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(data, handle, indent=2, sort_keys=True)
+            written[name] = path
+    inv_path = os.path.join(deep_dir, "deep-inventory.json")
+    with open(inv_path, "w", encoding="utf-8") as handle:
+        json.dump({"deep_inventory": deep_inv,
+                   "deep_tools": result.get("deep_tools")},
+                  handle, indent=2, sort_keys=True)
+    written["deep-inventory"] = inv_path
+    return written
+
+
 def write_reports(result, out_dir, formats=("html", "json")):
     os.makedirs(out_dir, exist_ok=True)
     written = {}
@@ -151,4 +241,5 @@ def write_reports(result, out_dir, formats=("html", "json")):
         written["json"] = write_json(result, os.path.join(out_dir, "report.json"))
     if "html" in formats:
         written["html"] = write_html(result, os.path.join(out_dir, "report.html"))
+    written.update(write_deep_files(result, out_dir))
     return written

@@ -1,4 +1,23 @@
-# Deep test report: APK Security Pipeline v2.0.0
+# Deep test report: APK Security Pipeline v2.1.0
+
+## v2.1.0 setup, per tool files, and colors verification (2026-10-28)
+
+- Total tests: 64, all passing (54 before + 10 new setup and color tests).
+- Real setup run on this machine: Java, apktool, jadx, androguard all
+  reported already present and were left untouched. frida-tools was
+  installed via pip, but the first run wrongly reported it as failed
+  because pip --user puts the binary in ~/.local/bin, which is not on
+  PATH. Fixed: detection and install now check ~/.local/bin
+  explicitly. Second setup run: all 5 tools already present, exit 0.
+- Color verified at byte level: forced color output contains ANSI
+  codes (cyan stage headers, bold title, grade colors), --no-color
+  output contains none, and piped output stays plain by default.
+- Per tool separation verified on a real deep scan: deep-work holds
+  apktool.json, jadx.json, androguard.json, and deep-inventory.json
+  next to apktool-out and jadx-out, and the HTML report has one
+  section per tool plus an APK contents breakdown table.
+
+## v2.0.0 deep mode verification (2026-10-28)
 
 ## v2.0.0 deep mode verification (2026-10-28)
 

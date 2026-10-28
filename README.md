@@ -1,8 +1,8 @@
 ![APK Security Pipeline hero banner](assets/hero-banner.svg)
 
-![Version](https://img.shields.io/badge/version-v2.0.0-5A45D6)
+![Version](https://img.shields.io/badge/version-v2.1.0-5A45D6)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-54%20passing-4E7A12)
+![Tests](https://img.shields.io/badge/tests-64%20passing-4E7A12)
 ![Dependencies](https://img.shields.io/badge/dependencies-none-4E7A12)
 ![License](https://img.shields.io/badge/license-MIT-5A45D6)
 
@@ -88,8 +88,10 @@ python3 -m apk_pipeline scan <input> [options]
 | `--deep` | Deep mode: apktool decode, jadx decompile, androguard, deep links, network config, signing, native libs |
 | `--decode-dir DIR` | Use an existing apktool decoded directory instead of decoding again |
 | `--skip-apktool`, `--skip-jadx`, `--skip-androguard` | Deep mode: skip one deep stage |
+| `--setup` | Install missing tools first, then scan |
+| `--color`, `--no-color` | Force or disable colorful CLI output |
 
-Other commands: `python3 -m apk_pipeline tools` shows detected real tools and install steps for missing ones.
+Other commands: `python3 -m apk_pipeline tools` shows detected real tools and install steps for missing ones. `python3 -m apk_pipeline setup` installs every missing tool (Java, apktool, jadx, androguard, frida-tools) and leaves present tools alone.
 
 Other commands: `python3 -m apk_pipeline rules` lists every built-in rule. `python3 -m apk_pipeline version` prints the version.
 
@@ -224,7 +226,28 @@ python3 -m apk_pipeline scan my-test-app.apk --deep --explain
 
 Verified on a real APK with real tools (apktool 3.0.3, jadx 1.5.6, androguard 4.1.4, Java 17): 340 smali files read with method context, 134 Java files decompiled and scanned, debug certificate correctly detected, dex counts matching (340 classes, 3602 methods). A missing tool is never silent: the report names it, explains the skip, and tells you how to install it. Deep stages also run from an existing decoded directory with `--decode-dir`, no apktool run needed.
 
-Deep findings carry their own rule ids: `SMALI_*` for smali, `JAVA_*` for Java sources, `NETCFG_*` for network config, `DEEPLINK_*` for deep links, `CERT_DEBUG` for debug signing, and `AG_*` for androguard referenced APIs.
+Deep findings carry their own rule ids: `SMALI_*` for smali, `JAVA_*` for Java sources, `NETCFG_*` for network config, `DEEPLINK_*` for deep links, `CERT_DEBUG` for debug signing, and `AG_*` for androguard referenced APIs. The HTML report shows one section per tool (apktool, jadx, androguard, signing, deep links, strings, network config, APK contents), and the output folder also gets one detail file per tool: `deep-work/apktool.json`, `deep-work/jadx.json`, `deep-work/androguard.json`, and `deep-work/deep-inventory.json`.
+
+## 🛠️ Auto install: setup
+
+Deep mode needs real tools, and setup installs them for you:
+
+```bash
+python3 -m apk_pipeline setup
+```
+
+Rules setup follows, in order:
+
+1. If a tool is already present, it is left alone. Never reinstalled, overwritten, or downgraded.
+2. Only missing tools are installed, Java first, because apktool and jadx need it.
+3. Every installed tool is verified (version check or import) before setup reports success.
+4. A failed install never blocks the others, and never fakes a tool as present. The report says what failed and gives the manual steps.
+
+Tools directory: `~/workspace/tools-apk` by default, or set `APK_PIPELINE_TOOLS_DIR`. On Linux as root, Java comes from apt; everywhere else setup prints the manual Java steps. You can also install on the fly before a scan: `python3 -m apk_pipeline scan app.apk --deep --setup`.
+
+## 🎨 Colorful CLI output
+
+CLI output is colorful on a real terminal: grades and severities get their own colors (green for A, red for F, red for critical, yellow for medium), stage headers are bold cyan, skips are yellow, and setup results show green for installed, cyan for already present, and red for failed. Colors turn off automatically when output is piped or when `NO_COLOR` is set. Force them with `--color`, disable them with `--no-color`.
 
 ## 🔁 Baseline and CI: fail only on new issues
 
@@ -273,13 +296,13 @@ apk_pipeline/
   scanner.py     stage orchestration, baseline compares, deep mode wiring
   deep.py        deep engine: smali, Java, network config, deep links,
                  signing, native libs, strings, androguard, apktool, jadx
-  tools.py       real tool detection (apktool, jadx, androguard, Java)
+  tools.py       real tool detection plus auto install (apktool, jadx, androguard, frida, Java)
   dynamic.py     Frida harness, device checks, log parsing
-  report.py      HTML and JSON writers, deep tool and inventory sections
-  cli.py         command line interface
+  report.py      HTML and JSON writers, deep per tool sections and files
+  cli.py         command line interface, colors, setup command
 frida/           runtime trace scripts plus guide
 samples/         sample APK generator plus clean and vulnerable test APKs
-tests/           unit tests, deep tests, and deep mode tests
+tests/           unit tests, deep tests, deep mode tests, setup and color tests
 assets/          hero banner, pipeline diagram, charts, report preview
 ```
 
@@ -296,7 +319,7 @@ Design choices worth knowing:
 python3 -m unittest discover -s tests -v
 ```
 
-54 tests, all passing. Coverage includes binary and plain manifest parsing, manifest variants, input handling, scoring math, secret masking, custom rules, baseline compares, report escaping (a crafted component name with script markup is escaped, not executed), determinism, CLI exit codes and formats, dynamic log edge cases, plus deep mode: method scoped smali, Java line and method context, network config, deep links, signing, native libs, strings masking, decoded directory end to end, and tool detection. The full deep test report, including defects found and fixed, is in [TEST_REPORT.md](TEST_REPORT.md).
+64 tests, all passing. Coverage includes binary and plain manifest parsing, manifest variants, input handling, scoring math, secret masking, custom rules, baseline compares, report escaping (a crafted component name with script markup is escaped, not executed), determinism, CLI exit codes and formats, dynamic log edge cases, plus deep mode: method scoped smali, Java line and method context, network config, deep links, signing, native libs, strings masking, decoded directory end to end, and tool detection, plus setup: present tools left alone, missing tools installed (mocked downloads), jadx unzip, frida local bin detection, per tool JSON files, contents breakdown, and forced color output. The full deep test report, including defects found and fixed, is in [TEST_REPORT.md](TEST_REPORT.md).
 
 ## ⚖️ How it compares
 
@@ -320,7 +343,7 @@ This tool does not claim to beat the big scanners. It claims to be small, fast, 
 
 ## 🗺️ Roadmap
 
-Done in v2.0.0: apktool decode, jadx decompile, smali and Java method level checks, deep link review, network security config review, signing checks, androguard dex facts.
+Done in v2.0.0: apktool decode, jadx decompile, smali and Java method level checks, deep link review, network security config review, signing checks, androguard dex facts. Done in v2.1.0: auto install setup, per tool separate results and files, colorful CLI.
 
 Still to come:
 
