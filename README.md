@@ -1,4 +1,4 @@
-# APK Security Pipeline
+![APK Security Pipeline hero banner](assets/hero-banner.svg)
 
 ![Version](https://img.shields.io/badge/version-v1.0.0-5A45D6)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
@@ -18,7 +18,7 @@ Give it an APK from a test app you own. It checks the manifest, the strings, the
 
 ![How the pipeline works](assets/pipeline-diagram.svg)
 
-## Why this tool, and why it is different
+## 🎯 Why this tool, and why it is different
 
 Most scanners print a wall of warnings and leave you to figure out what matters. This one is built around five ideas:
 
@@ -28,7 +28,7 @@ Most scanners print a wall of warnings and leave you to figure out what matters.
 4. **Safe by default.** Secret-like values are masked in every report. Dynamic scripts log hosts and algorithm names only, never full URLs, tokens, keys, or file contents.
 5. **Built for CI.** JSON output, baseline compares, and exit codes mean a build can fail on new issues only, not on old known ones.
 
-## Quick start
+## 🚀 Quick start
 
 ```bash
 git clone https://github.com/mizazhaider-ceh/apk-security-pipeline.git
@@ -41,7 +41,7 @@ python3 -m apk_pipeline scan samples/vulnerable.apk --static-only
 
 No install step. Python 3.10 or newer, standard library only.
 
-## What a run looks like
+## 👀 What a run looks like
 
 Clean sample:
 
@@ -67,7 +67,9 @@ Failing: findings at or above threshold 'high' found.
 
 The vulnerable sample plants, on purpose: a debuggable app, cleartext traffic, backup allowed, five exported components without permissions, four dangerous permissions, secret patterns, a cleartext URL, and risky code patterns (WebView settings, ECB, MD5, plain Random, debug logs).
 
-## Command reference
+![Sample results at a glance](assets/score-chart.svg)
+
+## ⌨️ Command reference
 
 ```bash
 python3 -m apk_pipeline scan <input> [options]
@@ -90,7 +92,7 @@ Input can be an APK file, a decoded APK directory (apktool style, with `AndroidM
 
 Exit codes: `0` means clean at your threshold, `2` means findings at or above your threshold, `1` means an input or scan error with a plain message, never a traceback.
 
-## What it checks: the full findings catalog
+## 🛡️ What it checks: the full findings catalog
 
 ### Manifest rules
 
@@ -136,7 +138,7 @@ Code patterns are review flags, not proof of exploitability on their own. The re
 
 Start at 100. Deduct 25 per Critical, 15 per High, 7 per Medium, 3 per Low, 0 per Info. Floor at 0. Grades: A (90+), B (75+), C (60+), D (40+), F (below 40). The same score on the same input is always the same: two runs produce byte identical JSON reports.
 
-## Explain mode: the tool tells you what it is doing
+## 💬 Explain mode: the tool tells you what it is doing
 
 ```text
 == APK Security Pipeline: what each stage did ==
@@ -164,12 +166,12 @@ Start at 100. Deduct 25 per Critical, 15 per High, 7 per Medium, 3 per Low, 0 pe
   Found: score 100, grade A
 ```
 
-## Reports: HTML for humans, JSON for machines
+## 📄 Reports: HTML for humans, JSON for machines
 
 - `report.html`: single file, inline CSS, no external requests, no JavaScript. Score bar, stage log table, findings with severity, rule id, location, masked evidence, why it matters, and how to fix it, plus the limits section.
 - `report.json`: the same data, sorted keys, for scripts, CI, and baseline compares. Fields include package, version, permissions, components, findings, score, grade, counts, stage log, baseline, and limits.
 
-## Dynamic testing with Frida
+## 🔬 Dynamic testing with Frida
 
 The automatic run never fakes dynamic evidence. If Frida or a device is missing, the report says so with the exact reason and setup steps, and the rest of the pipeline still runs.
 
@@ -192,7 +194,7 @@ How to run it, step by step (full guide in `frida/README.md`):
 
 Spawn versus attach, in short: spawn (`-f`) starts the app under Frida from the beginning and catches early calls. Attach (`-p <pid>`) connects to a running app where classes are already loaded. If a trace shows little at spawn, try attach after the main screen loads. Both behaviours are normal and worth noting in your report.
 
-## Baseline and CI: fail only on new issues
+## 🔁 Baseline and CI: fail only on new issues
 
 ```bash
 # First run: save the baseline
@@ -213,7 +215,7 @@ GitHub Actions example:
       --fail-on high
 ```
 
-## Custom rules
+## 🧩 Custom rules
 
 Add your own string patterns without touching the code:
 
@@ -228,7 +230,7 @@ python3 -m apk_pipeline scan app.apk --rules my-rules.json
 
 Bad regex in a custom rule does not crash the scan: the rule is skipped and the rest of the pipeline runs. That behaviour is covered by tests.
 
-## How it is built
+## 🏗️ How it is built
 
 ```text
 apk_pipeline/
@@ -253,7 +255,7 @@ Design choices worth knowing:
 - **Masking at the source.** The scanner masks values before reports are written, so no report writer can accidentally leak a secret.
 - **Skips are first class results.** A skipped stage is reported with its reason, not hidden. That is what makes the tool trustworthy in a review.
 
-## Testing
+## ✅ Testing
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -261,7 +263,7 @@ python3 -m unittest discover -s tests -v
 
 38 tests, all passing. Coverage includes binary and plain manifest parsing, manifest variants, input handling, scoring math, secret masking, custom rules, baseline compares, report escaping (a crafted component name with script markup is escaped, not executed), determinism, CLI exit codes and formats, and dynamic log edge cases. The full deep test report, including defects found and fixed, is in [TEST_REPORT.md](TEST_REPORT.md).
 
-## How it compares
+## ⚖️ How it compares
 
 | | APK Security Pipeline | Big all-in-one scanners |
 | --- | --- | --- |
@@ -273,7 +275,7 @@ python3 -m unittest discover -s tests -v
 
 This tool does not claim to beat the big scanners. It claims to be small, fast, clear, and fully explainable, which is a different and useful thing.
 
-## Limits, read these
+## ⚠️ Limits, read these
 
 - Static patterns are review flags, not proof of exploitability on their own.
 - Dynamic results only cover the flows you actually ran.
@@ -281,7 +283,7 @@ This tool does not claim to beat the big scanners. It claims to be small, fast, 
 - This tool never proves an app is safe. It reports what it found and what it checked.
 - A real production APK scan and a live Frida run on a real emulator are still the final proof steps, and they are tracked openly in TEST_REPORT.md.
 
-## Roadmap
+## 🗺️ Roadmap
 
 - More manifest rules: network security config review, deep link review.
 - Smali level checks with method context, not just byte patterns.
@@ -289,7 +291,7 @@ This tool does not claim to beat the big scanners. It claims to be small, fast, 
 - SARIF output for GitHub code scanning.
 - A second sample app with a real build (Kotlin) once an Android SDK is available.
 
-## FAQ
+## ❓ FAQ
 
 **Is this a hacking tool?**
 No. It is a testing pipeline for apps you own or have explicit permission to test. The safety rule is on the README cover and in every report footer for a reason.
@@ -312,10 +314,10 @@ Yes, with `--rules` and a JSON pattern file. Manifest rules and code patterns li
 **What Python version do I need?**
 Python 3.10 or newer. No packages to install.
 
-## Contributing
+## 🤝 Contributing
 
 Issues and pull requests are welcome. Please keep these rules: no new dependencies without a strong reason, every new rule gets a test, every finding keeps its explanation and fix text, and never add a real secret, real app, or real user data to samples or tests. Run the full suite before opening a pull request.
 
-## License
+## 📜 License
 
 MIT. Created by Muhammad Izaz Haider.
