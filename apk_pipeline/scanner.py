@@ -75,7 +75,9 @@ def _collect_input(path):
 
 def run_scan(input_path, explain=False, static_only=False,
              custom_rules=None, baseline_path=None, dynamic_seconds=20,
-             dynamic_log_path=None):
+             dynamic_log_path=None, deep=False, decode_dir=None,
+             skip_apktool=False, skip_jadx=False, skip_androguard=False,
+             work_root=None):
     """Run the full pipeline. Returns a result dict for reports."""
     stage_log = []
     manifest_bytes, files, intake_note = _collect_input(input_path)
@@ -127,7 +129,19 @@ def run_scan(input_path, explain=False, static_only=False,
             input_path, static_only=static_only, seconds=dynamic_seconds)
     stage_log.append(dynamic_log)
 
-    all_findings = man_findings + pattern_findings + dynamic_findings
+    deep_findings = []
+    deep_inventory = None
+    deep_tools = None
+    if deep:
+        from .deep import run_deep
+        deep_findings, deep_inventory, deep_log, deep_tools = run_deep(
+            input_path, info, files,
+            work_root or os.path.join(os.getcwd(), "deep-work"),
+            skip_apktool=skip_apktool, skip_jadx=skip_jadx,
+            skip_androguard=skip_androguard, decode_dir=decode_dir)
+        stage_log.extend(deep_log)
+
+    all_findings = man_findings + pattern_findings + dynamic_findings + deep_findings
     score, grade, counts = score_findings(all_findings)
     stage_log.append(_stage(
         "Scoring",
@@ -160,6 +174,9 @@ def run_scan(input_path, explain=False, static_only=False,
         "grade": grade,
         "counts": counts,
         "stage_log": stage_log,
+        "deep": bool(deep),
+        "deep_inventory": deep_inventory,
+        "deep_tools": deep_tools,
         "baseline": baseline,
         "limits": [
             "Static patterns are review flags, not proof of exploitability on their own.",

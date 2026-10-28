@@ -64,6 +64,40 @@ def write_html(result, path):
         for entry in result["stage_log"]
     )
     limits = "".join("<li>%s</li>" % html.escape(item) for item in result["limits"])
+    deep_html = ""
+    deep_inv = result.get("deep_inventory") or {}
+    if result.get("deep"):
+        tool_rows = ""
+        for name, info in (result.get("deep_tools") or {}).items():
+            tool_rows += "<tr><td><b>%s</b></td><td>%s</td><td>%s</td></tr>" % (
+                html.escape(name),
+                "found" if info.get("found") else "missing",
+                html.escape(info.get("path") or info.get("version") or info.get("install", "")))
+        links = deep_inv.get("deep_links", [])
+        libs = deep_inv.get("native_libs", [])
+        strings = deep_inv.get("strings", {})
+        hosts = strings.get("url_hosts", {}) if isinstance(strings, dict) else {}
+        host_rows = "".join("<li>%s (x%d)</li>" % (html.escape(h), c) for h, c in sorted(hosts.items()))
+        lib_rows = "".join("<li>%s (%s, %d bytes)</li>" % (
+            html.escape(item["path"]), html.escape(item["abi"]), item["size"]) for item in libs)
+        deep_html = (
+            "<h2>Deep mode: tools</h2><table><tr><th>Tool</th><th>Status</th><th>Path, version, or install note</th></tr>%s</table>"
+            "<h2>Deep mode: inventory</h2>"
+            "<p><b>Deep links:</b> %s</p>"
+            "<p><b>Native libraries (%d):</b></p><ul>%s</ul>"
+            "<p><b>URL hosts found:</b></p><ul>%s</ul>"
+            "<p><b>Signing:</b> %s</p>"
+            "<p><b>Smali stats:</b> %s</p>"
+            "<p><b>Java stats:</b> %s</p>"
+            "<p><b>Network config:</b> %s</p>"
+            % (tool_rows,
+               html.escape(", ".join(links)) if links else "none",
+               len(libs), lib_rows if lib_rows else "<li>none</li>",
+               host_rows if host_rows else "<li>none</li>",
+               html.escape(json.dumps(deep_inv.get("signing", {}), sort_keys=True)),
+               html.escape(json.dumps(deep_inv.get("smali", {}), sort_keys=True)),
+               html.escape(json.dumps(deep_inv.get("jadx", {}), sort_keys=True)),
+               html.escape(json.dumps(deep_inv.get("network_config", {}), sort_keys=True))))
     baseline_html = ""
     if result.get("baseline"):
         baseline = result["baseline"]
@@ -90,6 +124,7 @@ code{background:#EEE8FF;padding:1px 6px;border-radius:6px}</style></head>
 <h2>What each stage did</h2>
 <table><tr><th>Stage</th><th>Goal</th><th>Checked</th><th>Found</th><th>Skipped and why</th></tr>%s</table>
 %s
+%s
 <h2>Findings (%d)</h2>
 %s
 <h2>Limits, read these</h2><ul>%s</ul>
@@ -101,7 +136,7 @@ code{background:#EEE8FF;padding:1px 6px;border-radius:6px}</style></head>
         html.escape(str(result["input"])),
         result["score"], html.escape(str(result["grade"])), result["score"],
         html.escape(json.dumps(result["counts"], sort_keys=True)),
-        stages, baseline_html, len(findings),
+        stages, baseline_html, deep_html, len(findings),
         "\n".join(cards) if cards else "<p>No findings. That means none of the rules matched, not that the app is proven safe.</p>",
         limits)
     with open(path, "w", encoding="utf-8") as handle:

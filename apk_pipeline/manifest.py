@@ -70,14 +70,34 @@ def _from_tree(root):
             for comp in child.get("children", []):
                 if comp["name"] in ("activity", "service", "receiver", "provider"):
                     attrs = comp["attrs"]
+                    intent_filters = []
+                    for intent in comp.get("children", []):
+                        if intent["name"] != "intent-filter":
+                            continue
+                        entry = {"actions": [], "categories": [], "data": []}
+                        for part in intent.get("children", []):
+                            if part["name"] == "action":
+                                entry["actions"].append(part["attrs"].get("name", ""))
+                            elif part["name"] == "category":
+                                entry["categories"].append(part["attrs"].get("name", ""))
+                            elif part["name"] == "data":
+                                entry["data"].append({
+                                    "scheme": part["attrs"].get("scheme", ""),
+                                    "host": part["attrs"].get("host", ""),
+                                    "port": part["attrs"].get("port", ""),
+                                    "path": part["attrs"].get("path", ""),
+                                    "pathPrefix": part["attrs"].get("pathPrefix", ""),
+                                    "pathPattern": part["attrs"].get("pathPattern", ""),
+                                    "mimeType": part["attrs"].get("mimeType", ""),
+                                })
+                        intent_filters.append(entry)
                     info["components"].append({
                         "kind": comp["name"],
                         "name": attrs.get("name", ""),
                         "exported": _as_bool(attrs.get("exported")),
                         "permission": attrs.get("permission"),
-                        "has_intent_filter": any(
-                            c["name"] == "intent-filter"
-                            for c in comp.get("children", [])),
+                        "has_intent_filter": bool(intent_filters),
+                        "intent_filters": intent_filters,
                     })
     return info
 

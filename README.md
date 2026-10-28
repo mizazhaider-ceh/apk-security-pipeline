@@ -1,8 +1,8 @@
 ![APK Security Pipeline hero banner](assets/hero-banner.svg)
 
-![Version](https://img.shields.io/badge/version-v1.0.0-5A45D6)
+![Version](https://img.shields.io/badge/version-v2.0.0-5A45D6)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)
-![Tests](https://img.shields.io/badge/tests-38%20passing-4E7A12)
+![Tests](https://img.shields.io/badge/tests-54%20passing-4E7A12)
 ![Dependencies](https://img.shields.io/badge/dependencies-none-4E7A12)
 ![License](https://img.shields.io/badge/license-MIT-5A45D6)
 
@@ -85,6 +85,11 @@ python3 -m apk_pipeline scan <input> [options]
 | `--rules FILE` | JSON file with extra string patterns |
 | `--baseline FILE` | Previous `report.json` to compare against |
 | `--fail-on LEVEL` | Fail (exit 2) on findings at or above this level |
+| `--deep` | Deep mode: apktool decode, jadx decompile, androguard, deep links, network config, signing, native libs |
+| `--decode-dir DIR` | Use an existing apktool decoded directory instead of decoding again |
+| `--skip-apktool`, `--skip-jadx`, `--skip-androguard` | Deep mode: skip one deep stage |
+
+Other commands: `python3 -m apk_pipeline tools` shows detected real tools and install steps for missing ones.
 
 Other commands: `python3 -m apk_pipeline rules` lists every built-in rule. `python3 -m apk_pipeline version` prints the version.
 
@@ -194,6 +199,33 @@ How to run it, step by step (full guide in `frida/README.md`):
 
 Spawn versus attach, in short: spawn (`-f`) starts the app under Frida from the beginning and catches early calls. Attach (`-p <pid>`) connects to a running app where classes are already loaded. If a trace shows little at spawn, try attach after the main screen loads. Both behaviours are normal and worth noting in your report.
 
+## 🔬 Deep mode: open the app for real
+
+Basic mode reads the APK directly. Deep mode (`--deep`) unpacks and decompiles it with real tools, then reads it method by method:
+
+| Deep stage | Real tool | What it gives you |
+| --- | --- | --- |
+| Apktool decode | apktool | Decoded resources and smali, the true app structure |
+| Smali analysis | apktool output | Method level findings: risky APIs with file plus method context, crypto checks where the const string and the API call must be in the same method |
+| Jadx decompile | jadx | Java sources scanned with file, line number, and method context |
+| Dex facts | androguard | Class and method counts, referenced risky APIs |
+| Deep links | manifest | Every deep link, with web links and custom schemes flagged separately |
+| Network security config | decoded resources | Cleartext permission, certificate pinning, debug overrides |
+| Signing | APK entries | Debug certificate detection from META-INF |
+| Native libs and strings | APK entries | Shipped `.so` inventory, classified URL hosts and IP shapes with masking |
+
+```bash
+# See which real tools are available, and how to install missing ones
+python3 -m apk_pipeline tools
+
+# Deep scan a test app you own
+python3 -m apk_pipeline scan my-test-app.apk --deep --explain
+```
+
+Verified on a real APK with real tools (apktool 3.0.3, jadx 1.5.6, androguard 4.1.4, Java 17): 340 smali files read with method context, 134 Java files decompiled and scanned, debug certificate correctly detected, dex counts matching (340 classes, 3602 methods). A missing tool is never silent: the report names it, explains the skip, and tells you how to install it. Deep stages also run from an existing decoded directory with `--decode-dir`, no apktool run needed.
+
+Deep findings carry their own rule ids: `SMALI_*` for smali, `JAVA_*` for Java sources, `NETCFG_*` for network config, `DEEPLINK_*` for deep links, `CERT_DEBUG` for debug signing, and `AG_*` for androguard referenced APIs.
+
 ## 🔁 Baseline and CI: fail only on new issues
 
 ```bash
@@ -236,16 +268,19 @@ Bad regex in a custom rule does not crash the scan: the rule is skipped and the 
 apk_pipeline/
   axml.py        binary XML parser (standard library only)
   axml_write.py  binary XML writer, used for test fixtures
-  manifest.py    manifest extraction, binary or plain XML
+  manifest.py    manifest extraction, binary or plain XML, intent filters
   rules.py       rules, scoring, masking
-  scanner.py     stage orchestration, baseline compares
+  scanner.py     stage orchestration, baseline compares, deep mode wiring
+  deep.py        deep engine: smali, Java, network config, deep links,
+                 signing, native libs, strings, androguard, apktool, jadx
+  tools.py       real tool detection (apktool, jadx, androguard, Java)
   dynamic.py     Frida harness, device checks, log parsing
-  report.py      HTML and JSON writers
+  report.py      HTML and JSON writers, deep tool and inventory sections
   cli.py         command line interface
 frida/           runtime trace scripts plus guide
 samples/         sample APK generator plus clean and vulnerable test APKs
-tests/           unit tests and deep tests
-assets/          pipeline diagram and report preview
+tests/           unit tests, deep tests, and deep mode tests
+assets/          hero banner, pipeline diagram, charts, report preview
 ```
 
 Design choices worth knowing:
@@ -261,7 +296,7 @@ Design choices worth knowing:
 python3 -m unittest discover -s tests -v
 ```
 
-38 tests, all passing. Coverage includes binary and plain manifest parsing, manifest variants, input handling, scoring math, secret masking, custom rules, baseline compares, report escaping (a crafted component name with script markup is escaped, not executed), determinism, CLI exit codes and formats, and dynamic log edge cases. The full deep test report, including defects found and fixed, is in [TEST_REPORT.md](TEST_REPORT.md).
+54 tests, all passing. Coverage includes binary and plain manifest parsing, manifest variants, input handling, scoring math, secret masking, custom rules, baseline compares, report escaping (a crafted component name with script markup is escaped, not executed), determinism, CLI exit codes and formats, dynamic log edge cases, plus deep mode: method scoped smali, Java line and method context, network config, deep links, signing, native libs, strings masking, decoded directory end to end, and tool detection. The full deep test report, including defects found and fixed, is in [TEST_REPORT.md](TEST_REPORT.md).
 
 ## ⚖️ How it compares
 
@@ -285,8 +320,11 @@ This tool does not claim to beat the big scanners. It claims to be small, fast, 
 
 ## 🗺️ Roadmap
 
-- More manifest rules: network security config review, deep link review.
-- Smali level checks with method context, not just byte patterns.
+Done in v2.0.0: apktool decode, jadx decompile, smali and Java method level checks, deep link review, network security config review, signing checks, androguard dex facts.
+
+Still to come:
+
+- More manifest rules: task affinity, allowBackup deep review.
 - Automatic dynamic runs once a target package and flow file are given.
 - SARIF output for GitHub code scanning.
 - A second sample app with a real build (Kotlin) once an Android SDK is available.

@@ -5,6 +5,8 @@ Usage:
   python3 -m apk_pipeline scan decoded_dir -o out --format both
   python3 -m apk_pipeline scan app.apk --static-only --fail-on high
   python3 -m apk_pipeline scan app.apk --dynamic-log frida-log.jsonl
+  python3 -m apk_pipeline scan app.apk --deep --explain
+  python3 -m apk_pipeline tools
   python3 -m apk_pipeline rules
   python3 -m apk_pipeline version
 
@@ -60,7 +62,11 @@ def _cmd_scan(args):
             args.input, explain=args.explain,
             static_only=args.static_only, custom_rules=custom,
             baseline_path=args.baseline,
-            dynamic_log_path=args.dynamic_log)
+            dynamic_log_path=args.dynamic_log,
+            deep=args.deep, decode_dir=args.decode_dir,
+            skip_apktool=args.skip_apktool, skip_jadx=args.skip_jadx,
+            skip_androguard=args.skip_androguard,
+            work_root=os.path.join(args.output, "deep-work"))
     except ScanError as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 1
@@ -107,6 +113,20 @@ def _cmd_rules(_args):
     return 0
 
 
+def _cmd_tools(_args):
+    from .tools import detect_tools
+    tools = detect_tools()
+    for name in ("java", "apktool", "jadx", "androguard"):
+        info = tools[name]
+        status = "found" if info["found"] else "MISSING"
+        print("%s: %s %s" % (name, status, info["path"] or info["version"] or ""))
+        if info["version"]:
+            print("  version: %s" % info["version"])
+        if not info["found"]:
+            print("  install: %s" % info["install"])
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="apk-security-pipeline",
@@ -130,7 +150,19 @@ def build_parser():
                       help="Previous report.json to compare against")
     scan.add_argument("--fail-on", choices=THRESHOLDS, default="high",
                       help="Fail (exit 2) when findings at or above this severity exist")
+    scan.add_argument("--deep", action="store_true",
+                      help="Deep mode: apktool decode, jadx decompile, androguard, deep links, network config, signing, native libs (uses real tools when installed, reports skips otherwise)")
+    scan.add_argument("--decode-dir", default=None,
+                      help="Use an existing apktool decoded directory instead of decoding again")
+    scan.add_argument("--skip-apktool", action="store_true",
+                      help="Deep mode: skip the apktool stage")
+    scan.add_argument("--skip-jadx", action="store_true",
+                      help="Deep mode: skip the jadx stage")
+    scan.add_argument("--skip-androguard", action="store_true",
+                      help="Deep mode: skip the androguard stage")
     scan.set_defaults(func=_cmd_scan)
+    tools_cmd = sub.add_parser("tools", help="List detected real tools for deep mode and how to install missing ones.")
+    tools_cmd.set_defaults(func=_cmd_tools)
     rules = sub.add_parser("rules", help="List built-in rules.")
     rules.set_defaults(func=_cmd_rules)
     version = sub.add_parser("version", help="Print the tool version.")

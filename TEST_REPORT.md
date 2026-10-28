@@ -1,4 +1,26 @@
-# Deep test report: APK Security Pipeline v0.1.0
+# Deep test report: APK Security Pipeline v2.0.0
+
+## v2.0.0 deep mode verification (2026-10-28)
+
+- Total tests: 54, all passing (42 before + 12 new deep mode tests).
+- Real tools installed and verified on this machine: Java 17.0.20.1, apktool 3.0.3, jadx 1.5.6, androguard 4.1.4. `python3 -m apk_pipeline tools` finds all four.
+- Real APK deep scan (TestActivity.apk, 175 KB, debug signed test app):
+  apktool decoded 340 smali files (2600 methods seen, 8 smali findings
+  with method context), jadx produced 134 Java files (1 Java finding
+  with file, line, and method), androguard reported 340 dex classes
+  and 3602 dex methods, debug certificate correctly detected, final
+  score 26/100 grade F with 12 findings (up from 2 basic findings).
+- Graceful degradation: deep scan on the synthetic vulnerable sample
+  completes with 24 findings and reports apktool and jadx stages
+  honestly instead of crashing.
+- Defects fixed during v2 testing: (1) deep strings summary counted
+  the Android namespace URI as a URL host; fixed by excluding
+  namespace hosts, same rule as the static stage. (2) androguard 4
+  returns raw dex bytes from get_dex(), not a DEX object; fixed by
+  parsing bytes explicitly with androguard.core.dex.DEX, and
+  androguard's own debug logging is silenced so CLI output stays clean.
+
+## v1.0.1 and earlier report
 
 Date: 2026-10-28. Method: unit tests plus manual CLI checks, same style
 as the AgentArsenal test rounds (happy path, edge cases, failure paths,
